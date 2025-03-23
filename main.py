@@ -61,7 +61,37 @@ def test_someip_sd_option():
     print(opt.pack().hex())
 
 
+def test_someip_sd_packet():
+    from someip.someip_sd.type import (
+        SomeIpSDPacket
+    )
+    from someip.someip_sd.entry import (
+        SOMEIPSDEventgroupEntry,
+        ET_SUBSCRIBE,
+    )
+    entry = SOMEIPSDEventgroupEntry(
+        type=ET_SUBSCRIBE,
+        index1=1,
+        index2=2,
+        num_option1=3,
+        num_option2=4,
+        service_id=0xABCD,
+        instance_id=0xFFFF,
+        major_version=0x01,
+        ttl=0x112233,
+        counter=5,
+        eventgroup_id=0xAABB
+    )
+    packet = SomeIpSDPacket(
+        is_reboot=True,
+        entries=[entry],
+    )
+    print(packet)
+    print(packet.pack().hex())
+
+
 if __name__ == "__main__":
     test_someip_packet()
     test_someip_sd_entry()
     test_someip_sd_option()
+    test_someip_sd_packet()

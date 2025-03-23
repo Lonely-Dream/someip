@@ -1,6 +1,7 @@
-from dataclasses import dataclass
-from typing import ClassVar
+import abc
 from struct import Struct
+from typing import ClassVar
+from dataclasses import dataclass
 
 ET_FIND_SERVICE = 0x00
 ET_OFFER_SERVICE = 0x01
@@ -12,8 +13,19 @@ ET_SUBSCRIBE_ACK = 0x07
 ET_SUBSCRIBE_EVENTGROUP_NACK = 0x07
 
 
+class BaseEntry(abc.ABC):
+    @abc.abstractmethod
+    def pack(self) -> bytes:
+        raise NotImplementedError()
+
+    @classmethod
+    @abc.abstractmethod
+    def unpack(cls, data: bytes) -> 'BaseEntry':
+        raise NotImplementedError()
+
+
 @dataclass
-class SOMEIPSDServiceEntry:
+class SOMEIPSDServiceEntry(BaseEntry):
     type: int
     index1: int
     index2: int
@@ -55,7 +67,7 @@ class SOMEIPSDServiceEntry:
 
 
 @dataclass
-class SOMEIPSDEventgroupEntry:
+class SOMEIPSDEventgroupEntry(BaseEntry):
     type: int
     index1: int
     index2: int
@@ -99,9 +111,7 @@ class SOMEIPSDEventgroupEntry:
                    counter, eventgroup_id)
 
 
-ENTRY_TYPE = type[SOMEIPSDServiceEntry] | type[SOMEIPSDEventgroupEntry]
-
-ENTRY_TYPE_MAP: dict[int, ENTRY_TYPE] = {
+ENTRY_TYPE_MAP: dict[int, type[BaseEntry]] = {
     ET_FIND_SERVICE: SOMEIPSDServiceEntry,
     ET_OFFER_SERVICE: SOMEIPSDServiceEntry,
     ET_STOP_OFFER_SERVICE: SOMEIPSDServiceEntry,

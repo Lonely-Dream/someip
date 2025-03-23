@@ -1,11 +1,24 @@
-from dataclasses import dataclass, field
-from typing import ClassVar
-from struct import Struct
+import abc
 import socket
+from struct import Struct
+from typing import ClassVar
+from dataclasses import dataclass, field
 
 OT_CONFIG = 0x01
 OT_LOAD_BALANCING = 0x02
 OT_IPV4_ENDPOINT = 0x04
+
+
+class BaseOption(abc.ABC):
+
+    @abc.abstractmethod
+    def pack(self) -> bytes:
+        raise NotImplementedError()
+
+    @classmethod
+    @abc.abstractmethod
+    def unpack(cls, data: bytes) -> 'BaseOption':
+        raise NotImplementedError()
 
 
 def encode_config(config: dict[str, str]) -> bytes:
@@ -34,7 +47,7 @@ def decode_config(data: bytes) -> dict[str, str]:
 
 
 @dataclass
-class ConfigOption:
+class ConfigOption(BaseOption):
     config: dict[str, str]
     can_discard: bool = field(default=True)
 
@@ -64,7 +77,7 @@ class ConfigOption:
 
 
 @dataclass
-class LoadBalancingOption:
+class LoadBalancingOption(BaseOption):
     priority: int
     weight: int
     can_discard: bool = field(default=True)
@@ -98,7 +111,7 @@ L4_PROTO_I2S = {v: k for k, v in L4_PROTO_S2I.items()}
 
 
 @dataclass
-class IPv4EndpointOption:
+class IPv4EndpointOption(BaseOption):
     addr: str
     l4_proto: str
     port: int
@@ -135,11 +148,7 @@ class IPv4EndpointOption:
         return cls(addr, l4_proto, port)
 
 
-OPTION_TYPE = type[ConfigOption] \
-    | type[LoadBalancingOption] \
-    | type[IPv4EndpointOption]
-
-OPTION_TYPE_MAP: dict[int, OPTION_TYPE] = {
+OPTION_TYPE_MAP: dict[int, type[BaseOption]] = {
     OT_CONFIG: ConfigOption,
     OT_LOAD_BALANCING: LoadBalancingOption,
     OT_IPV4_ENDPOINT: IPv4EndpointOption,
