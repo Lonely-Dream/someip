@@ -13,12 +13,19 @@ class BaseOption(abc.ABC):
 
     @abc.abstractmethod
     def pack(self) -> bytes:
-        raise NotImplementedError()
+        raise NotImplementedError("Must implement pack() method.")
+
+    @abc.abstractmethod
+    def __len__(self) -> int:
+        """
+        Return the length of the option in bytes.
+        """
+        raise NotImplementedError("Must implement __len__() method.")
 
     @classmethod
     @abc.abstractmethod
     def unpack(cls, data: bytes) -> 'BaseOption':
-        raise NotImplementedError()
+        raise NotImplementedError("Must implement unpack() method.")
 
 
 def encode_config(config: dict[str, str]) -> bytes:
@@ -55,10 +62,13 @@ class ConfigOption(BaseOption):
 
     def pack(self) -> bytes:
         config_bytes = encode_config(self.config)
-        length = 0x0001+len(config_bytes)
+        length = 0x0001 + len(config_bytes)
         type = OT_CONFIG
         discard_flag = 0x80 if self.can_discard else 0x00
         return ConfigOption._st.pack(length, type, discard_flag) + config_bytes
+
+    def __len__(self) -> int:
+        return self._st.size + len(encode_config(self.config))
 
     @classmethod
     def unpack(cls, data: bytes) -> 'ConfigOption':
@@ -91,11 +101,15 @@ class LoadBalancingOption(BaseOption):
         return LoadBalancingOption._st.pack(length, type, discard_flag,
                                             self.priority, self.weight)
 
+    def __len__(self) -> int:
+        return self._st.size
+
     @classmethod
     def unpack(cls, data: bytes) -> 'LoadBalancingOption':
         if len(data) != cls._st.size:
             raise ValueError("Invalid LoadBalancingOption data")
-        length, type, discard_flag, priority, weight = cls._st.unpack(data)
+        length, type, discard_flag, priority, weight = cls._st.unpack(
+            data[:cls._st.size])
         if type != OT_LOAD_BALANCING:
             raise ValueError("Invalid LoadBalancingOption type")
         can_discard = ((discard_flag >> 7) & 1) == 1
@@ -131,12 +145,17 @@ class IPv4EndpointOption(BaseOption):
                                            addr_bytes,
                                            l4_proto_int, self.port)
 
+    def __len__(self) -> int:
+        return self._st.size
+
     @classmethod
     def unpack(cls, data: bytes) -> 'IPv4EndpointOption':
-        if len(data) != cls._st.size:
+        if len(data) < cls._st.size:
             raise ValueError(f"invalid data length: {len(data)}")
+        # 允许传入过长字节
         length, type, discard_flag, \
-            addr_bytes, l4_proto_int, port = cls._st.unpack(data)
+            addr_bytes, l4_proto_int, port = cls._st.unpack(
+                data[:cls._st.size])
         if type != OT_IPV4_ENDPOINT:
             raise ValueError(f"invalid type: {type}")
         # can_discard = ((discard_flag >> 7) & 1) == 1
