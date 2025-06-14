@@ -95,6 +95,8 @@ CallbackType = TypeVar("CallbackType", bound=Callable[[SOMEIPPacket], None])
 class SomeIpClient:
     client_ip: str
     client_id: int
+    server_ip: str
+    server_port: int
     multicast_ip: str
     multicast_port: int
     protocol_version: int
@@ -110,7 +112,11 @@ class SomeIpClient:
     sock: socket.socket
     recv_thread: threading.Thread
 
-    def __init__(self, multicast_ip: str, multicast_port: int,
+    def __init__(self,
+                 server_ip: str,
+                 server_port: int,
+                 multicast_ip: str,
+                 multicast_port: int,
                  client_ip: str | None = None,
                  client_id: int = 0xFE,
                  protocol_version: int = 0x01,
@@ -122,6 +128,8 @@ class SomeIpClient:
             print(f"client_ip is None, use localhost. {client_ip}")
         self.client_ip = client_ip
         self.client_id = client_id
+        self.server_ip = server_ip
+        self.server_port = server_port
         self.multicast_ip = multicast_ip
         self.multicast_port = multicast_port
         self.protocol_version = protocol_version
@@ -147,15 +155,19 @@ class SomeIpClient:
         self.recv_thread.start()
 
     def request(self,
-                server_ip: str,
-                server_port: int,
                 service_id: int,
                 method_id: int,
                 payload: bytes,
+                server_ip: str | None = None,
+                server_port: int | None = None,
                 protocol_version: int | None = None,
                 interface_version: int | None = None,
                 callback: CallbackType | None = None,
                 timeout: int = 5):
+        if server_ip is None:
+            server_ip = self.server_ip
+        if server_port is None:
+            server_port = self.server_port
 
         if protocol_version is None:
             protocol_version = self.protocol_version
@@ -194,9 +206,10 @@ class SomeIpClient:
                 callback(packet)
 
     def subscribe(self,
-                  server_ip: str,
                   service_id: int,
                   eventgroup_id: int,
+                  server_ip: str | None = None,
+                  server_port: int | None = None,
                   instance_id: int = 0xFFFF,
                   major_version: int = 0xFF,
                   ttl: int = 0xFFFFFF,
@@ -204,6 +217,10 @@ class SomeIpClient:
                   interface_version: int | None = None,
                   callback: CallbackType | None = None,
                   ):
+        if server_ip is None:
+            server_ip = self.server_ip
+        if server_port is None:
+            server_port = self.server_port
         if protocol_version is None:
             protocol_version = self.protocol_version
         if interface_version is None:
@@ -244,7 +261,15 @@ class SomeIpClient:
             payload=someip_sd_packet.pack()
         )
 
-        self.sock.sendto(packet.pack(), (server_ip, self.multicast_port))
+        # 不能向多包地址发送订阅包
+        # self.sock.sendto(
+        #     packet.pack(),
+        #     (self.multicast_ip,
+        #      self.multicast_port))
+        self.sock.sendto(
+            packet.pack(),
+            (self.server_ip,
+             self.multicast_port))
         self.session_id += 1
 
     def stop_subscribe(self,
